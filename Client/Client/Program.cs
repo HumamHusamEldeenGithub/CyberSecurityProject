@@ -3,13 +3,17 @@ using System.Net.Sockets;
 using System.Net;
 using System.Text;
 using System.Threading;
+using System.Text.RegularExpressions;
 
 namespace MultiClient
 {
-    class Program
+    class Client
     {
         private static readonly Socket ClientSocket = new Socket
             (AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        private static string aes_key;
+        private static string aes_iv;
+        private static readonly string[] flags = { "ACK", "RCV" , "DIS" , "AES" };
 
         private const int PORT = 100;
 
@@ -103,6 +107,10 @@ namespace MultiClient
         /// </summary>
         private static void SendString(string text)
         {
+            if (aes_key != null)
+            {
+                text = AesEncryption.Encryptor.EncryptDataWithAes(text, aes_key, aes_iv);
+            }
             byte[] buffer = Encoding.ASCII.GetBytes(text);
             ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
         }
@@ -115,7 +123,41 @@ namespace MultiClient
             var data = new byte[received];
             Array.Copy(buffer, data, received);
             string text = Encoding.ASCII.GetString(data);
-            Console.WriteLine(text);
+
+            HandelIncomingData(text);
+        }
+
+        private static void HandelIncomingData(string input)
+        {
+            if (aes_key != null)
+            {
+                input = AesEncryption.Encryptor.DecryptDataWithAes(input, aes_key, aes_iv);
+            }
+
+            string pattern = @"(<\|[a-zA-Z]+\|>)?(.*)";
+            var matches = Regex.Match(input, pattern);
+            string flag = matches.Groups[1].Value;
+            string data = matches.Groups[2].Value.Trim();
+
+            switch (flag)
+            {
+                case ("<|ACK|>"):
+                    break;
+                case ("<|AES|>"):
+                    SaveAESCredentials(data);
+                    break;
+                default:
+                    Console.WriteLine(input);
+                    break;
+            }
+        }
+
+        private static void SaveAESCredentials(string data)
+        {
+            string[] temp = data.Split(' ');
+            aes_key = temp[0];
+            aes_iv = temp[1];
+            Console.WriteLine("Logged in !");
         }
     }
 }

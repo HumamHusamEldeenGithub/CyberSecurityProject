@@ -6,6 +6,8 @@ using System.Text;
 using ServerClient;
 using MongoDB.Driver;
 using MongoDB.Bson;
+using AesEncryption;
+using System.Security.Cryptography;
 
 namespace MultiServer
 {
