@@ -1,0 +1,7 @@
+E:\Repos\CyberProject\Client\Client\bin\Debug\Client.exe.config
+E:\Repos\CyberProject\Client\Client\bin\Debug\Client.exe
+E:\Repos\CyberProject\Client\Client\bin\Debug\Client.pdb
+E:\Repos\CyberProject\Client\Client\obj\Debug\Client.csproj.CoreCompileInputs.cache
+E:\Repos\CyberProject\Client\Client\obj\Debug\Client.exe
+E:\Repos\CyberProject\Client\Client\obj\Debug\Client.pdb
+E:\Repos\CyberProject\Client\Client\obj\Debug\Client.csprojAssemblyReference.cache
