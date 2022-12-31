@@ -4,16 +4,33 @@ using System.Net;
 using System.Text;
 using System.Threading;
 using System.Text.RegularExpressions;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Security.Cryptography;
+using Client; 
 
 namespace MultiClient
 {
     class Client
     {
+
+        public enum Flags
+        {
+            PUB_KEY,
+            ERR,
+            MSG,
+            INF,
+            AES
+        };
+
         private static readonly Socket ClientSocket = new Socket
             (AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         private static string aes_key;
         private static string aes_iv;
-        private static readonly string[] flags = { "ACK", "RCV" , "DIS" , "AES" };
+
+        public static RsaEncryption rsaEncryption ;
+
+        private static readonly string[] flags = { "PUB_KEY", "ERR" , "MSG" , "INF" , "AES" };
 
         private const int PORT = 100;
 
@@ -22,7 +39,7 @@ namespace MultiClient
             Console.Title = "Client";
             ConnectToServer();
             Thread t1 = new Thread(new ThreadStart(SendLoop));
-            Thread t2 = new Thread(new ThreadStart(RequestLoop2));
+            Thread t2 = new Thread(new ThreadStart(RequestLoop));
             t2.Start();
             t1.Start();
             t2.Join();
@@ -52,17 +69,6 @@ namespace MultiClient
             Console.WriteLine("Connected");
         }
 
-        private static void RequestLoop()
-        {
-            Console.WriteLine(@"<Type ""exit"" to properly disconnect client>");
-
-            while (true)
-            {
-                ReceiveResponse();
-                SendRequest();
-            }
-        }
-
         private static void SendLoop()
         {
             
@@ -71,7 +77,7 @@ namespace MultiClient
                 SendRequest();
             }
         }
-        private static void RequestLoop2()
+        private static void RequestLoop()
         {
 
             while (true)
@@ -93,10 +99,22 @@ namespace MultiClient
 
         private static void SendRequest()
         {
-            string request = Console.ReadLine();
-            SendString(request);
+            Console.WriteLine("FLAG = "); 
+            string requestFlag = Console.ReadLine();
+            Console.WriteLine("message = ");
+            string requestMsg = Console.ReadLine();
 
-            if (request.ToLower() == "exit")
+            SocketMessage socketMessage = new SocketMessage
+            {
+                Flag = requestFlag,
+                Message = requestMsg
+            };
+
+            string jsonString = JsonSerializer.Serialize(socketMessage);
+
+            SendString(jsonString);
+
+            if (requestFlag.ToLower() == "exit")
             {
                 Exit();
             }
@@ -107,11 +125,12 @@ namespace MultiClient
         /// </summary>
         private static void SendString(string text)
         {
-            if (aes_key != null)
-            {
-                text = AesEncryption.Encryptor.EncryptDataWithAes(text, aes_key, aes_iv);
-            }
             byte[] buffer = Encoding.ASCII.GetBytes(text);
+            if (rsaEncryption != null)
+            {
+                buffer = RsaEncryption.RSAEncrypt(buffer, rsaEncryption.publicKey, false);
+            }
+            
             ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
         }
 
@@ -120,36 +139,64 @@ namespace MultiClient
             var buffer = new byte[2048];
             int received = ClientSocket.Receive(buffer, SocketFlags.None);
             if (received == 0) return;
+
             var data = new byte[received];
             Array.Copy(buffer, data, received);
-            string text = Encoding.ASCII.GetString(data);
+            string jsonStr = Encoding.ASCII.GetString(data);
 
-            HandelIncomingData(text);
-        }
-
-        private static void HandelIncomingData(string input)
-        {
             if (aes_key != null)
             {
-                input = AesEncryption.Encryptor.DecryptDataWithAes(input, aes_key, aes_iv);
+                jsonStr = AesEncryption.Encryptor.DecryptDataWithAes(jsonStr, aes_key, aes_iv);
             }
 
-            string pattern = @"(<\|[a-zA-Z]+\|>)?(.*)";
-            var matches = Regex.Match(input, pattern);
-            string flag = matches.Groups[1].Value;
-            string data = matches.Groups[2].Value.Trim();
+            SocketMessage socketMessage =
+                JsonSerializer.Deserialize<SocketMessage>(jsonStr);
 
+            HandelIncomingData(socketMessage.Flag ,socketMessage.Message);
+        }
+
+        private static void HandelIncomingData(string flag, string message)
+        {
             switch (flag)
             {
-                case ("<|ACK|>"):
+                case ("ACK"):
                     break;
-                case ("<|AES|>"):
-                    SaveAESCredentials(data);
+                case ("PUB_KEY"):
+                    SaveRSAPublicKey(message);
+                    GenerateNewAESCreadentials();
+                    SendAESKey();
                     break;
+                case ("AES"):
+                    SaveAESCredentials(message);
+                    break;
+                case ("RCV"):
+                    TriggerMessageReceivedEvent();
+                    break;
+                case ("ERR"):
+                    TriggerErrorEvent();
+                        break; 
                 default:
-                    Console.WriteLine(input);
+                    Console.WriteLine(message);
                     break;
             }
+        }
+
+        private static void GenerateNewAESCreadentials()
+        {
+            string aes_keyBase64, aes_ivBase64;
+            using (Aes aesAlgorithm = Aes.Create())
+            {
+                aesAlgorithm.KeySize = 256;
+                aesAlgorithm.GenerateKey();
+                aesAlgorithm.GenerateIV();
+                aes_keyBase64 = Convert.ToBase64String(aesAlgorithm.Key);
+                aes_ivBase64 = Convert.ToBase64String(aesAlgorithm.IV);
+            }
+            Console.WriteLine("New AES Key " + aes_keyBase64);
+            Console.WriteLine("New AES IV " + aes_ivBase64);
+
+            aes_key = aes_keyBase64;
+            aes_iv = aes_ivBase64;
         }
 
         private static void SaveAESCredentials(string data)
@@ -157,7 +204,34 @@ namespace MultiClient
             string[] temp = data.Split(' ');
             aes_key = temp[0];
             aes_iv = temp[1];
-            Console.WriteLine("Logged in !");
+        }
+
+        private static void SendAESKey()
+        {
+            SocketMessage socketMessage = new SocketMessage
+            {
+                Flag = "AES",
+                Message = aes_key+" "+aes_iv
+            };
+
+            string jsonString = JsonSerializer.Serialize(socketMessage);
+
+            SendString(jsonString);
+        }
+
+        private static void SaveRSAPublicKey(string key)
+        {
+            rsaEncryption = new RsaEncryption(key);
+        }
+
+        private static void TriggerMessageReceivedEvent()
+        {
+            Console.WriteLine("Message Sent and Received successfully !");
+        }
+
+        private static void TriggerErrorEvent()
+        {
+            Console.WriteLine("Error occured !");
         }
     }
 }

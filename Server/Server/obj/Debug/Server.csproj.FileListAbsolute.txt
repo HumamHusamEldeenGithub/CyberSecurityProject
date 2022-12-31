@@ -42,3 +42,11 @@ E:\Repos\CyberProject\Server\Server\bin\Debug\System.Security.Principal.Windows.
 E:\Repos\CyberProject\Server\Server\bin\Debug\System.Text.Encoding.CodePages.xml
 E:\Repos\CyberProject\Server\Server\bin\Debug\System.Threading.Tasks.Extensions.xml
 E:\Repos\CyberProject\Server\Server\obj\Debug\Server.csproj.CopyComplete
+E:\Repos\CyberProject\Server\Server\bin\Debug\System.Json.dll
+E:\Repos\CyberProject\Server\Server\bin\Debug\System.Text.Encodings.Web.dll
+E:\Repos\CyberProject\Server\Server\bin\Debug\System.Text.Json.dll
+E:\Repos\CyberProject\Server\Server\bin\Debug\System.ValueTuple.dll
+E:\Repos\CyberProject\Server\Server\bin\Debug\System.Json.xml
+E:\Repos\CyberProject\Server\Server\bin\Debug\System.Text.Encodings.Web.xml
+E:\Repos\CyberProject\Server\Server\bin\Debug\System.Text.Json.xml
+E:\Repos\CyberProject\Server\Server\bin\Debug\System.ValueTuple.xml

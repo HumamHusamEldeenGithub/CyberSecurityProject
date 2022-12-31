@@ -9,35 +9,35 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Server;
 
 namespace ServerClient
 {
-    class Client
+    class ClientManager
     {
-        public enum Status
-        {
-            NewUser , 
-            Logging,
-            Logged
-        }
-
         public string[] commands = { "/login -usr=456132 -pass=abcd1234" , "/logout" , "/chat" , "/msg" , "/h" }; 
         public string phone_number;
         public string password;
         public string currentChatID;
         public string currentReceiver;
-        public Socket socket;
-        public Status currentStatus = Status.NewUser;
 
+        public  Socket socket;
         private const int BUFFER_SIZE = 2048;
         private static readonly byte[] buffer = new byte[BUFFER_SIZE];
         private Dictionary<string,object> profile; 
         private string aes_key , aes_iv ; 
 
-        public Client(Socket socket)
+        public ClientManager(Socket socket)
         {
             this.socket = socket;
-            SendSocketMessage("Welcome , Here's list of available commands : \n" + string.Join(" , ", commands));
+
+            SendRSAPublicKey();
+
+            //GenerateNewAESCreadentials();
+
+            //SendSocketMessage("Welcome , Here's list of available commands : \n" + string.Join(" , ", commands));
             this.socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, this.socket);
         }
 
@@ -45,59 +45,41 @@ namespace ServerClient
         {
             Socket current = (Socket)AR.AsyncState;
 
-            string text = GetMessageFromSocket(AR);
-            Console.WriteLine("Received Text: " + text);
+            string jsonStr = GetMessageFromSocket(AR);
+            Console.WriteLine("Received Text: " + jsonStr);
 
-            if (aes_key != null)
-            {
-                text = AesEncryption.Encryptor.DecryptDataWithAes(text, aes_key, aes_iv);
-                Console.WriteLine("Decrypt Text : " + text);
-            }
+            SocketMessage socketMessage =
+                JsonSerializer.Deserialize<SocketMessage>(jsonStr);
 
-            string pattern = @"/([a-zA-Z]+)(.*)";
-            var matches = Regex.Match(text, pattern);
-
-            string command = matches.Groups[1].Value;
-            string msg = matches.Groups[2].Value.Trim();
-
-            switch (command)
+            switch (socketMessage.Flag)
             {
                 case ("login"):
-                    TriggerLoginEvent(msg);
+                    TriggerLoginEvent(socketMessage.Message);
                     break;
                 case ("logout"):
                     TriggerLogoutEvent();
                     break;
                 case ("chat"):
-                    TriggerChatEvent(msg);
+                    TriggerChatEvent(socketMessage.Message);
                     break;
                 case ("msg"):
-                    TriggerMessageEvent(msg);
+                    TriggerMessageEvent(socketMessage.Message);
                     break;
-                case ("h"):
+                case ("AES"):
+                    SaveAESCredentials(socketMessage.Message);
                     break;
                 default:
-                    SendSocketMessage("Invalid command");
+                    SendSocketMessage("ERR", "Invalid command");
                     break;
             }
 
             current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
-/*
-            else if (text.ToLower() == "exit") // Client wants to exit gracefully
-            {
-                // Always Shutdown before closing
-                current.Shutdown(SocketShutdown.Both);
-                current.Close();
-                //clientSockets.Remove(current);
-                Console.WriteLine("Client disconnected");
-                return;
-            }*/
         }
 
         private void TriggerLoginEvent(string input)
         {
             if (phone_number != null)
-                SendSocketMessage("User already logged in ...");
+                SendSocketMessage("ERR", "User already logged in ...");
 
             string pattern = @"-usr=([0-9]+) -pass=([A-Za-z0-9]+)";
             var matches = Regex.Match(input, pattern);
@@ -107,63 +89,61 @@ namespace ServerClient
 
             if (this.phone_number == "" || this.password== "")
             {
-                SendSocketMessage("Invalid Username and Password");
+                SendSocketMessage("ERR", "Invalid Username and Password");
             }
 
-            if (!CheckPhonenumberAndPassword())
+            if (!CheckUserCredentails())
             {
                 Console.WriteLine("Password incorrect ! ");
 
-                SendSocketMessage("Password incorrect ! ");
+                SendSocketMessage("ERR","Password incorrect ! ");
 
                 ResetClient();
+
+                return;
             }
             Console.WriteLine("User with phone number " + this.phone_number + " has logged in .");
 
-            string aes_key = (string)this.profile["aes_key"];
-            string aes_iv = (string)this.profile["aes_iv"];
-
-            SendSocketMessage("<|AES|> " + aes_key + " " + aes_iv);
-
-            this.aes_key = aes_key;
-            this.aes_iv = aes_iv;
-
+            SendSocketMessage("ACK","Logged in successfully !");
         }
 
         private void TriggerLogoutEvent()
         {
             ResetClient();
-            SendSocketMessage("Logged out successfully");
+            SendSocketMessage("ERR","Logged out successfully");
         }
 
         private void TriggerChatEvent(string receiver)
         {
             if (this.profile == null)
             {
-                SendSocketMessage("Plesae log in first ...");
+                SendSocketMessage("ERR","Plesae log in first ...");
                 return;
             }
 
             this.currentChatID = GetChatID(receiver);
             if (this.currentChatID == null)
-                this.socket.Send(Encoding.ASCII.GetBytes("User doesn't have an account ..."));
+                SendSocketMessage("ERR","User doesn't have an account ...");
+
             this.currentReceiver = receiver;
-            SendSocketMessage(GetChatMessages());
+            SendSocketMessage("INF",GetChatMessages());
         }
 
         private void TriggerMessageEvent(string msg)
         {
             if (this.profile == null)
             {
-                SendSocketMessage("Plesae log in first ...");
+                SendSocketMessage("ERR","Plesae log in first ...");
                 return;
             }
 
             if (this.currentChatID == null || this.currentChatID == "")
             {
-                SendSocketMessage("User doesn't have an account ...");
+                SendSocketMessage("ERR","User doesn't have an account ...");
             }
             SendMessageToPhonenumber(this.currentReceiver, msg);
+
+            SendSocketMessage("RCV","");
         }
 
 
@@ -178,7 +158,10 @@ namespace ServerClient
                 received = current.EndReceive(AR);
                 byte[] recBuf = new byte[received];
                 Array.Copy(buffer, recBuf, received);
-                string input = Encoding.ASCII.GetString(recBuf);
+
+                byte[]  decryptedMessage = RsaEncryption.RSADecrypt(recBuf, Program.rsaEncryption.privateKey, false); 
+
+                string input = Encoding.ASCII.GetString(decryptedMessage);
                 return input;
             }
             catch (SocketException)
@@ -191,24 +174,23 @@ namespace ServerClient
             }
         }
 
-        private string SendMessageToPhonenumber(string receiver, string msg)
+        private void SendMessageToPhonenumber(string receiver, string msg)
         {
             SaveMessageToDB(this.currentChatID, msg);
 
             msg = receiver + " >> " + msg; 
             
-            foreach (Client client in Program.clientsProfile)
+            foreach (ClientManager client in Program.clientsProfile)
             {
                 if (client.phone_number == receiver)
                 {
-                    client.socket.Send(Encoding.ASCII.GetBytes(msg));
-                    return "Sent and Received";
+                    client.SendSocketMessage("MSG",msg);
+                    return;
                 }
             }
-            return "Sent but not received";
         }
 
-        private bool CheckPhonenumberAndPassword()
+        private bool CheckUserCredentails()
         {
             var bsonDoc = GetUserProfile(this.phone_number);
             if (bsonDoc == null)
@@ -242,24 +224,12 @@ namespace ServerClient
             IMongoDatabase db = Program.mongoDBClient.GetDatabase("users");
             var profiles = db.GetCollection<BsonDocument>("profiles");
             string uuid = System.Guid.NewGuid().ToString();
-            string aes_keyBase64, aes_ivBase64;
-
-            using (Aes aesAlgorithm = Aes.Create())
-            {
-                aesAlgorithm.KeySize = 256;
-                aesAlgorithm.GenerateKey();
-                aesAlgorithm.GenerateIV();
-                aes_keyBase64 = Convert.ToBase64String(aesAlgorithm.Key);
-                aes_ivBase64 = Convert.ToBase64String(aesAlgorithm.IV);
-            }
 
             var doc = new BsonDocument
             {
                 {"uuid", uuid},
                 {"phonenumber", this.phone_number},
                 {"password", this.password},
-                {"aes_key" , aes_keyBase64},
-                {"aes_iv" , aes_ivBase64},
                 {"chats", new BsonArray{ } }
             };
 
@@ -354,73 +324,55 @@ namespace ServerClient
         {
             this.phone_number = null;
             this.password = null;
-            this.currentStatus = Status.NewUser;
             this.profile = null;
         }
-        private void SendSocketMessage(string msg)
+        private void SendSocketMessage(string flag,string msg)
         {
+            SocketMessage socketMessage = new SocketMessage { 
+                Flag=flag,
+                Message=msg
+            };
+
+            string jsonString = JsonSerializer.Serialize(socketMessage);
+
             if (this.aes_key != null)
             {
-                msg = AesEncryption.Encryptor.EncryptDataWithAes(msg, aes_key, aes_iv);
+                jsonString = AesEncryption.Encryptor.EncryptDataWithAes(jsonString, aes_key, aes_iv);
             }
-
-            this.socket.Send(Encoding.ASCII.GetBytes(msg));
+            this.socket.Send(Encoding.ASCII.GetBytes(jsonString));
         }
 
-
-
-
-
-
-
-
-
-
-       /*private void ReceiveUsernameAndPhonenumber(IAsyncResult AR)
+        private void  GenerateNewAESCreadentials()
         {
-            if (this.currentStatus == Status.NewUser)
+            string aes_keyBase64, aes_ivBase64;
+            using (Aes aesAlgorithm = Aes.Create())
             {
-                SendSocketMessage("Enter phone number: ");
-
-                this.currentStatus = Status.Logging;
-
-                this.socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, this.ReceiveUsernameAndPhonenumber, this.socket);
+                aesAlgorithm.KeySize = 256;
+                aesAlgorithm.GenerateKey();
+                aesAlgorithm.GenerateIV();
+                aes_keyBase64 = Convert.ToBase64String(aesAlgorithm.Key);
+                aes_ivBase64 = Convert.ToBase64String(aesAlgorithm.IV);
             }
-            else if (this.currentStatus == Status.Logging)
-            {
-                Socket current = (Socket)AR.AsyncState;
-                string input = GetMessageFromSocket(AR);
+            Console.WriteLine("New AES Key " + aes_keyBase64);
+            Console.WriteLine("New AES IV " + aes_ivBase64);
 
-                if (this.phone_number == null)
-                {
-                    this.phone_number = input;
-                    Console.WriteLine("Received phone number : " + this.phone_number);
+            SendSocketMessage("AES", aes_keyBase64 + " " + aes_ivBase64);
 
-                    SendSocketMessage("Enter password : ");
+            this.aes_key = aes_keyBase64;
+            this.aes_iv = aes_ivBase64;
+        }
 
-                    this.socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, this.ReceiveUsernameAndPhonenumber, this.socket);
-                }
-                else if (this.password == null)
-                {
-                    this.password = input;
-                    Console.WriteLine("Recieved password : " + this.password);
+        private void SaveAESCredentials(string data)
+        {
+            // TODO : VALIDATE AES KEY
+            string[] temp = data.Split(' ');
+            this.aes_key = temp[0];
+            this.aes_iv = temp[1];
+        }
 
-                    if (!CheckPhonenumberAndPassword())
-                    {
-                        Console.WriteLine("Password incorrect ! ");
-
-                        SendSocketMessage("Password incorrect ! ");
-
-                        ResetClient();
-                    }
-                }
-            }
-        }*/
-
-
-
-
-
-
+        private void SendRSAPublicKey()
+        {
+            SendSocketMessage("PUB_KEY", Program.rsaEncryption.publicKeyStr);
+        }
     }
 }

@@ -8,6 +8,7 @@ using MongoDB.Driver;
 using MongoDB.Bson;
 using AesEncryption;
 using System.Security.Cryptography;
+using Server;
 
 namespace MultiServer
 {
@@ -16,11 +17,13 @@ namespace MultiServer
         #region Parameters
         private static readonly Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         public static readonly List<Socket> clientSockets = new List<Socket>();
-        public static readonly List<Client> clientsProfile = new List<Client>();
+        public static readonly List<ClientManager> clientsProfile = new List<ClientManager>();
         private const int PORT = 100;
 
         private const int BUFFER_SIZE = 2048;
         private static readonly byte[] buffer = new byte[BUFFER_SIZE];
+
+        public static RsaEncryption rsaEncryption = new RsaEncryption(); 
 
         public static MongoClient mongoDBClient;
         private const string mongoURI = "mongodb+srv://Humam:pwaIR4tEdVQIYcll@cyberproject.rfgzhgh.mongodb.net/?retryWrites=true&w=majority";
@@ -77,7 +80,7 @@ namespace MultiServer
 
             clientSockets.Add(socket);
 
-            Client newClient = new Client(socket);
+            ClientManager newClient = new ClientManager(socket);
             clientsProfile.Add(newClient);
 
             Console.WriteLine("Client connected, waiting for request...");
