@@ -91,7 +91,7 @@ namespace MultiClient
         /// </summary>
         private static void Exit()
         {
-            SendString("exit"); // Tell the server we are exiting
+            //SendString("exit"); // Tell the server we are exiting
             ClientSocket.Shutdown(SocketShutdown.Both);
             ClientSocket.Close();
             Environment.Exit(0);
@@ -104,34 +104,8 @@ namespace MultiClient
             Console.WriteLine("message = ");
             string requestMsg = Console.ReadLine();
 
-            SocketMessage socketMessage = new SocketMessage
-            {
-                Flag = requestFlag,
-                Message = requestMsg
-            };
+            SendSocketMessage(requestFlag, requestMsg);
 
-            string jsonString = JsonSerializer.Serialize(socketMessage);
-
-            SendString(jsonString);
-
-            if (requestFlag.ToLower() == "exit")
-            {
-                Exit();
-            }
-        }
-
-        /// <summary>
-        /// Sends a string to the server with ASCII encoding.
-        /// </summary>
-        private static void SendString(string text)
-        {
-            byte[] buffer = Encoding.ASCII.GetBytes(text);
-            if (rsaEncryption != null)
-            {
-                buffer = RsaEncryption.RSAEncrypt(buffer, rsaEncryption.publicKey, false);
-            }
-            
-            ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
         }
 
         private static void ReceiveResponse()
@@ -149,8 +123,23 @@ namespace MultiClient
                 jsonStr = AesEncryption.Encryptor.DecryptDataWithAes(jsonStr, aes_key, aes_iv);
             }
 
+            SignedSocketMessage signedSocketMessage  =
+                JsonSerializer.Deserialize<SignedSocketMessage>(jsonStr);
+
             SocketMessage socketMessage =
-                JsonSerializer.Deserialize<SocketMessage>(jsonStr);
+                JsonSerializer.Deserialize<SocketMessage>(signedSocketMessage.Data);
+
+            Console.WriteLine(socketMessage.Message);
+
+            if (signedSocketMessage.Signature != "")
+            {
+                if (!RsaEncryption.VerifySignature(Encoding.ASCII.GetBytes(signedSocketMessage.Data) ,
+                    rsaEncryption.publicKey, Convert.FromBase64String(signedSocketMessage.Signature)))
+                {
+                    Console.WriteLine("Signature invalid !!");
+                    return; 
+                }
+            }
 
             HandelIncomingData(socketMessage.Flag ,socketMessage.Message);
         }
@@ -173,7 +162,7 @@ namespace MultiClient
                     TriggerMessageReceivedEvent();
                     break;
                 case ("ERR"):
-                    TriggerErrorEvent();
+                    TriggerErrorEvent(message);
                         break; 
                 default:
                     Console.WriteLine(message);
@@ -208,15 +197,35 @@ namespace MultiClient
 
         private static void SendAESKey()
         {
+            SendSocketMessage("AES" , aes_key + " " + aes_iv);
+        }
+
+        private static void SendSocketMessage(string flag , string msg)
+        {
             SocketMessage socketMessage = new SocketMessage
             {
-                Flag = "AES",
-                Message = aes_key+" "+aes_iv
+                Flag = flag,
+                Message = msg
             };
 
             string jsonString = JsonSerializer.Serialize(socketMessage);
 
-            SendString(jsonString);
+            SignedSocketMessage signedSocketMessage = new SignedSocketMessage
+            {
+                Data = jsonString,
+                Signature = ""
+            };
+
+            string response = JsonSerializer.Serialize(signedSocketMessage);
+
+            byte[] buffer = Encoding.ASCII.GetBytes(response);
+
+            if (rsaEncryption != null)
+            {
+                buffer = RsaEncryption.RSAEncrypt(buffer, rsaEncryption.publicKey, false);
+            }
+
+            ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
         }
 
         private static void SaveRSAPublicKey(string key)
@@ -229,9 +238,9 @@ namespace MultiClient
             Console.WriteLine("Message Sent and Received successfully !");
         }
 
-        private static void TriggerErrorEvent()
+        private static void TriggerErrorEvent(string message)
         {
-            Console.WriteLine("Error occured !");
+            Console.WriteLine("Error occured : " + message);
         }
     }
 }

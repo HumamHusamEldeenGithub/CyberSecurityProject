@@ -12,4 +12,10 @@ namespace Server
         public string Message { get; set; }
 
     }
+    class SignedSocketMessage
+    {
+        public string Data { get; set; }
+        public string Signature { get; set; }
+
+    }
 }

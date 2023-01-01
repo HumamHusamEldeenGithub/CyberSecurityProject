@@ -10,7 +10,7 @@ namespace Client
 
         public RsaEncryption()
         {
-            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider())
+            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
             {
                 this.publicKey = RSA.ExportParameters(false);
                 this.privateKey = RSA.ExportParameters(true);
@@ -19,7 +19,7 @@ namespace Client
 
         public RsaEncryption(string pubKey)
         {
-            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider())
+            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
             {
                 RSA.FromXmlString(pubKey);
                 this.publicKey = RSA.ExportParameters(false);
@@ -32,7 +32,7 @@ namespace Client
             {
                 byte[] encryptedData;
                 //Create a new instance of RSACryptoServiceProvider.
-                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider())
+                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
                 {
 
                     //Import the RSA Key information. This only needs
@@ -62,7 +62,7 @@ namespace Client
             {
                 byte[] decryptedData;
                 //Create a new instance of RSACryptoServiceProvider.
-                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider())
+                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
                 {
                     //Import the RSA Key information. This needs
                     //to include the private key information.
@@ -82,6 +82,51 @@ namespace Client
                 Console.WriteLine(e.ToString());
 
                 return null;
+            }
+        }
+
+        public static byte[] CreateSignature(byte[] data, RSAParameters RSAKeyInfo)
+        {
+            byte[] signedHash;
+
+            SHA256 alg = SHA256.Create();
+            byte[] hash = alg.ComputeHash(data);
+
+            // Generate signature
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            {
+                rsa.ImportParameters(RSAKeyInfo);
+
+                RSAPKCS1SignatureFormatter RSAFormatter = new RSAPKCS1SignatureFormatter(rsa);
+                RSAFormatter.SetHashAlgorithm(nameof(SHA256));
+
+                signedHash = RSAFormatter.CreateSignature(hash);
+            }
+            return signedHash;
+        }
+
+        public static bool VerifySignature(byte[] data, RSAParameters RSAKeyInfo, byte[] signedHash)
+        {
+            SHA256 alg = SHA256.Create();
+            byte[] hash = alg.ComputeHash(data);
+            // Verify signature
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            {
+                rsa.ImportParameters(RSAKeyInfo);
+
+                RSAPKCS1SignatureDeformatter RSADeormatter = new RSAPKCS1SignatureDeformatter(rsa);
+                RSADeormatter.SetHashAlgorithm(nameof(SHA256));
+
+                if (RSADeormatter.VerifySignature(hash, signedHash))
+                {
+                    Console.WriteLine("The signature is valid.");
+                    return true;
+                }
+                else
+                {
+                    Console.WriteLine("The signature is not valid.");
+                    return false;
+                }
             }
         }
     }

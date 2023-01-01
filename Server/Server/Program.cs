@@ -40,6 +40,7 @@ namespace MultiServer
             Console.ReadLine(); // When we press enter close everything
             CloseAllSockets();
         }
+
         #region Setup Server
         private static void SetupServer()
         {

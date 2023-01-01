@@ -17,6 +17,7 @@ namespace ServerClient
 {
     class ClientManager
     {
+        #region Parameters
         public string[] commands = { "/login -usr=456132 -pass=abcd1234" , "/logout" , "/chat" , "/msg" , "/h" }; 
         public string phone_number;
         public string password;
@@ -27,7 +28,8 @@ namespace ServerClient
         private const int BUFFER_SIZE = 2048;
         private static readonly byte[] buffer = new byte[BUFFER_SIZE];
         private Dictionary<string,object> profile; 
-        private string aes_key , aes_iv ; 
+        private string aes_key , aes_iv ;
+        #endregion
 
         public ClientManager(Socket socket)
         {
@@ -41,6 +43,8 @@ namespace ServerClient
             this.socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, this.socket);
         }
 
+        #region Events Triggers
+
         private void ReceiveCallback(IAsyncResult AR)
         {
             Socket current = (Socket)AR.AsyncState;
@@ -48,8 +52,11 @@ namespace ServerClient
             string jsonStr = GetMessageFromSocket(AR);
             Console.WriteLine("Received Text: " + jsonStr);
 
+            SignedSocketMessage signedSocketMessage =
+                JsonSerializer.Deserialize<SignedSocketMessage>(jsonStr);
+
             SocketMessage socketMessage =
-                JsonSerializer.Deserialize<SocketMessage>(jsonStr);
+                JsonSerializer.Deserialize<SocketMessage>(signedSocketMessage.Data);
 
             switch (socketMessage.Flag)
             {
@@ -146,8 +153,9 @@ namespace ServerClient
             SendSocketMessage("RCV","");
         }
 
+        #endregion
 
-
+        #region MongoDB Function
         private static string GetMessageFromSocket(IAsyncResult AR)
         {
             Socket current = (Socket)AR.AsyncState;
@@ -190,22 +198,7 @@ namespace ServerClient
             }
         }
 
-        private bool CheckUserCredentails()
-        {
-            var bsonDoc = GetUserProfile(this.phone_number);
-            if (bsonDoc == null)
-            {
-                CreateNewProfile();
-                return true;
-            }
-            this.profile = bsonDoc.ToDictionary();
-            string pass = (string)profile["password"];
 
-            // TODO : Hash and Compare the hash 
-            if (string.Compare(pass , this.password) == 0)
-                return true;
-            return false;
-        }
 
         private BsonDocument GetUserProfile(string phonenumber)
         {
@@ -319,6 +312,25 @@ namespace ServerClient
             profiles.UpdateOne(filter1, update1);
             profiles.UpdateOne(filter2, update2);
         }
+        #endregion
+
+        #region Utils
+        private bool CheckUserCredentails()
+        {
+            var bsonDoc = GetUserProfile(this.phone_number);
+            if (bsonDoc == null)
+            {
+                CreateNewProfile();
+                return true;
+            }
+            this.profile = bsonDoc.ToDictionary();
+            string pass = (string)profile["password"];
+
+            // TODO : Hash and Compare the hash 
+            if (string.Compare(pass, this.password) == 0)
+                return true;
+            return false;
+        }
 
         private void ResetClient()
         {
@@ -330,16 +342,29 @@ namespace ServerClient
         {
             SocketMessage socketMessage = new SocketMessage { 
                 Flag=flag,
-                Message=msg
+                Message=msg,
             };
 
             string jsonString = JsonSerializer.Serialize(socketMessage);
 
+            byte[] signatureBuff = RsaEncryption.CreateSignature(Encoding.ASCII.GetBytes(jsonString), Program.rsaEncryption.privateKey);
+
+            SignedSocketMessage signedSocketMessage = new SignedSocketMessage
+            {
+                Data = jsonString,
+                Signature = Convert.ToBase64String(signatureBuff)
+            }; 
+
+            Console.WriteLine(RsaEncryption.VerifySignature(Encoding.ASCII.GetBytes(jsonString),Program.rsaEncryption.publicKey ,Convert.FromBase64String(signedSocketMessage.Signature)));
+
+            string response = JsonSerializer.Serialize(signedSocketMessage);
+
             if (this.aes_key != null)
             {
-                jsonString = AesEncryption.Encryptor.EncryptDataWithAes(jsonString, aes_key, aes_iv);
+                response = AesEncryption.Encryptor.EncryptDataWithAes(response, aes_key, aes_iv);
             }
-            this.socket.Send(Encoding.ASCII.GetBytes(jsonString));
+
+            this.socket.Send(Encoding.ASCII.GetBytes(response));
         }
 
         private void  GenerateNewAESCreadentials()
@@ -372,7 +397,28 @@ namespace ServerClient
 
         private void SendRSAPublicKey()
         {
-            SendSocketMessage("PUB_KEY", Program.rsaEncryption.publicKeyStr);
+            SocketMessage socketMessage = new SocketMessage
+            {
+                Flag = "PUB_KEY",
+                Message = Program.rsaEncryption.publicKeyStr,
+            };
+
+            Console.WriteLine(socketMessage.Message);
+
+            string jsonString = JsonSerializer.Serialize(socketMessage);
+
+            SignedSocketMessage signedSocketMessage = new SignedSocketMessage
+            {
+                Data = jsonString,
+                Signature = ""
+            };
+
+            string response = JsonSerializer.Serialize(signedSocketMessage);
+
+            Console.WriteLine(response);
+
+            this.socket.Send(Encoding.ASCII.GetBytes(response));
         }
+        #endregion
     }
 }
