@@ -19,7 +19,7 @@ namespace MultiClient
     class Client
     {
         #region Parameters
-        private const string serverUUID = "9947afce-8aa9-11ed-a1eb-0242ac120009";
+        private const string serverUUID = "www.chatapp.com";
 
         private static readonly Socket ClientSocket = new Socket
             (AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);

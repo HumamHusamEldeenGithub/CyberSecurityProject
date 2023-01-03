@@ -26,7 +26,7 @@ namespace MultiServer
         public static readonly List<ClientManager> clientsProfile = new List<ClientManager>();
         public static List<SocketMessage> MessageQueue = new List<SocketMessage>();
 
-        private const string serverUUID = "*.chat.com";
+        private const string serverUUID = "www.chatapp.com";
 
         public static RsaEncryption rsaEncryption = new RsaEncryption(); 
 
@@ -90,10 +90,13 @@ namespace MultiServer
             Console.WriteLine("Getting server certificate ... ");
 
             X509Certificate2 cert = GetX509Certificate(serverUUID);
-            //RSAParameters public_key =cert.GetPublicKey();
-            string private_key_xml = GetPrivateKeyFromDB(serverUUID); 
 
-            rsaEncryption = new RsaEncryption(private_key_xml);
+            string filename = serverUUID + "-private-key.txt";
+            if (File.Exists(filename))
+            {
+                string privateKeyXML = File.ReadAllText(filename);
+                rsaEncryption = new RsaEncryption(privateKeyXML);
+            }
         }
 
         private static void CloseAllSockets()
@@ -165,6 +168,11 @@ namespace MultiServer
                 store.Close();
 
                 SavePrivateKeyToDB(uuid, RSA.ToXmlString(true));
+
+                using (StreamWriter sw = File.AppendText(uuid + "-private-key.txt"))
+                {
+                    sw.WriteLine(RSA.ToXmlString(true));
+                }
 
                 Console.WriteLine("New certificate issued ! ");
 

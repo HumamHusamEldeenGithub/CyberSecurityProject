@@ -9,6 +9,7 @@ using MongoDB.Bson;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using Server;
+using MultiServer; 
 
 namespace ServerClient
 {
@@ -118,13 +119,13 @@ namespace ServerClient
 
         private void CheckForIncomingMessages()
         {
-            foreach (SocketMessage message in Program.MessageQueue.ToList())
+            foreach (SocketMessage message in MultiServer.Server.MessageQueue.ToList())
             {
                 if (message.Receiver == this.phone_number)
                 {
                     string jsonString = JsonSerializer.Serialize(message);
                     SendSocketMessage(jsonString);
-                    Program.MessageQueue.Remove(message);
+                    MultiServer.Server.MessageQueue.Remove(message);
                     System.Threading.Thread.Sleep(500);
                 }
             }
@@ -152,7 +153,7 @@ namespace ServerClient
                 }
                 else
                 {
-                    byte[] decryptedMessage = RsaEncryption.RSADecrypt(recBuf, Program.rsaEncryption.privateKey, false);
+                    byte[] decryptedMessage = RsaEncryption.RSADecrypt(recBuf, MultiServer.Server.rsaEncryption.privateKey, false);
 
                     input = Encoding.ASCII.GetString(decryptedMessage);
                 }
@@ -170,7 +171,7 @@ namespace ServerClient
                 Console.WriteLine("Client forcefully disconnected");
                 // Don't shutdown because the socket may be disposed and its disconnected anyway.
                 current.Close();
-                Program.clientSockets.Remove(current);
+                MultiServer.Server.clientSockets.Remove(current);
                 return null;
             }
         }
@@ -179,7 +180,7 @@ namespace ServerClient
         {
             string jsonString = JsonSerializer.Serialize(msg);
 
-            foreach (ClientManager client in Program.clientsProfile)
+            foreach (ClientManager client in MultiServer.Server.clientsProfile)
             {
                 if (client.phone_number == msg.Receiver)
                 {
@@ -187,7 +188,7 @@ namespace ServerClient
                     return;
                 }
             }
-            Program.MessageQueue.Add(msg);
+            MultiServer.Server.MessageQueue.Add(msg);
         }
 
         private void SendSocketMessage(string flag, string msg)
@@ -200,7 +201,7 @@ namespace ServerClient
 
             string jsonString = JsonSerializer.Serialize(socketMessage);
 
-            byte[] signatureBuff = RsaEncryption.CreateSignature(Encoding.ASCII.GetBytes(jsonString), Program.rsaEncryption.privateKey);
+            byte[] signatureBuff = RsaEncryption.CreateSignature(Encoding.ASCII.GetBytes(jsonString), MultiServer.Server.rsaEncryption.privateKey);
 
             SignedSocketMessage signedSocketMessage = new SignedSocketMessage
             {
@@ -220,7 +221,7 @@ namespace ServerClient
 
         private void SendSocketMessage(string jsonString)
         {
-            byte[] signatureBuff = RsaEncryption.CreateSignature(Encoding.ASCII.GetBytes(jsonString), Program.rsaEncryption.privateKey);
+            byte[] signatureBuff = RsaEncryption.CreateSignature(Encoding.ASCII.GetBytes(jsonString), MultiServer.Server.rsaEncryption.privateKey);
 
             SignedSocketMessage signedSocketMessage = new SignedSocketMessage
             {
@@ -243,7 +244,7 @@ namespace ServerClient
 
         private BsonDocument GetUserProfile(string phonenumber)
         {
-            IMongoDatabase db = Program.mongoDBClient.GetDatabase("users");
+            IMongoDatabase db = MultiServer.Server.mongoDBClient.GetDatabase("users");
             var profiles = db.GetCollection<BsonDocument>("profiles");
 
             var filter = Builders<BsonDocument>.Filter.Eq("phonenumber", this.phone_number);
@@ -255,7 +256,7 @@ namespace ServerClient
 
         private void CreateNewProfile()
         {
-            IMongoDatabase db = Program.mongoDBClient.GetDatabase("users");
+            IMongoDatabase db = MultiServer.Server.mongoDBClient.GetDatabase("users");
             var profiles = db.GetCollection<BsonDocument>("profiles");
             string uuid = System.Guid.NewGuid().ToString();
 
