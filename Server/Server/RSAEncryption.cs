@@ -8,18 +8,47 @@ namespace Server
         public  RSAParameters publicKey;
         public  RSAParameters privateKey;
 
-        public string publicKeyStr; 
+        public string privateKeyStr;
+        public string publicKeyStr;
 
         public RsaEncryption()
         {
-            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
+            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(4096))
             {
                 this.publicKey = RSA.ExportParameters(false);
                 this.privateKey = RSA.ExportParameters(true);
 
+                this.privateKeyStr = RSA.ToXmlString(true);
                 this.publicKeyStr = RSA.ToXmlString(false);
             }
         }
+
+        public RsaEncryption(RSAParameters publicKey, RSAParameters privateKey)
+        {
+            this.publicKey = publicKey;
+            this.privateKey = privateKey;
+
+            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(4096))
+            {
+                RSA.ImportParameters(privateKey);
+                RSA.ImportParameters(publicKey);
+                this.publicKeyStr = RSA.ToXmlString(false);
+                this.privateKeyStr = RSA.ToXmlString(true);
+            }
+        }
+
+        public RsaEncryption(string privateKeyXML)
+        {
+            using (RSA rsa = RSA.Create(2048))
+            {
+                rsa.FromXmlString(privateKeyXML);
+                this.privateKey = rsa.ExportParameters(true);
+                this.publicKey = rsa.ExportParameters(true);
+                this.publicKeyStr = rsa.ToXmlString(false);
+                this.privateKeyStr = rsa.ToXmlString(true);
+            }
+        }
+
 
         public static byte[] RSAEncrypt(byte[] DataToEncrypt, RSAParameters RSAKeyInfo, bool DoOAEPPadding)
         {
@@ -27,7 +56,7 @@ namespace Server
             {
                 byte[] encryptedData;
                 //Create a new instance of RSACryptoServiceProvider.
-                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
+                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(4096))
                 {
 
                     //Import the RSA Key information. This only needs
@@ -57,7 +86,7 @@ namespace Server
             {
                 byte[] decryptedData;
                 //Create a new instance of RSACryptoServiceProvider.
-                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
+                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(4096))
                 {
                     //Import the RSA Key information. This needs
                     //to include the private key information.
@@ -88,7 +117,7 @@ namespace Server
             byte[] hash = alg.ComputeHash(data);
 
             // Generate signature
-            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(4096))
             {
                 rsa.ImportParameters(RSAKeyInfo);
 
@@ -105,7 +134,7 @@ namespace Server
             SHA256 alg = SHA256.Create();
             byte[] hash = alg.ComputeHash(data);
             // Verify signature
-            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(4096))
             {
                 rsa.ImportParameters(RSAKeyInfo);
 

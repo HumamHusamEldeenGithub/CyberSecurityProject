@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 
 namespace AesEncryption
 {
-    class Encryptor
+    class AesEncryptor
     {
         public static string EncryptDataWithAes(string plainText, string keyBase64, string vectorBase64)
         {

@@ -10,19 +10,21 @@ namespace Client
 
         public RsaEncryption()
         {
-            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
+            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(4096))
             {
                 this.publicKey = RSA.ExportParameters(false);
                 this.privateKey = RSA.ExportParameters(true);
             }
         }
 
-        public RsaEncryption(string pubKey)
+        public RsaEncryption(string key , bool includePrivateKey)
         {
-            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
+            using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(4096))
             {
-                RSA.FromXmlString(pubKey);
+                RSA.FromXmlString(key);
                 this.publicKey = RSA.ExportParameters(false);
+                if (includePrivateKey)
+                    this.privateKey = RSA.ExportParameters(includePrivateKey);
             }
         }
 
@@ -32,7 +34,7 @@ namespace Client
             {
                 byte[] encryptedData;
                 //Create a new instance of RSACryptoServiceProvider.
-                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
+                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(4096))
                 {
 
                     //Import the RSA Key information. This only needs
@@ -62,7 +64,7 @@ namespace Client
             {
                 byte[] decryptedData;
                 //Create a new instance of RSACryptoServiceProvider.
-                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(2048))
+                using (RSACryptoServiceProvider RSA = new RSACryptoServiceProvider(4096))
                 {
                     //Import the RSA Key information. This needs
                     //to include the private key information.
@@ -93,7 +95,7 @@ namespace Client
             byte[] hash = alg.ComputeHash(data);
 
             // Generate signature
-            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(4096))
             {
                 rsa.ImportParameters(RSAKeyInfo);
 
@@ -110,7 +112,7 @@ namespace Client
             SHA256 alg = SHA256.Create();
             byte[] hash = alg.ComputeHash(data);
             // Verify signature
-            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(2048))
+            using (RSACryptoServiceProvider rsa = new RSACryptoServiceProvider(4096))
             {
                 rsa.ImportParameters(RSAKeyInfo);
 
