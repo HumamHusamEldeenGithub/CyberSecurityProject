@@ -66,6 +66,7 @@ namespace ServerClient
             }
             current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, MainLoop, current);
         }
+
         #endregion
 
         #region Events
@@ -236,6 +237,7 @@ namespace ServerClient
 
             this.socket.Send(Encoding.ASCII.GetBytes(response));
         }
+
         #endregion
 
         #region MongoDB Function

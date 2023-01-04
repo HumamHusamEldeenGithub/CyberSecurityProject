@@ -52,6 +52,8 @@ namespace Client
                     text = (this.MainChatBox.Text + "\n" + text).Replace("\n", "\r\n");
                 }
                 this.MainChatBox.Text = text;
+                this.MainChatBox.SelectionStart = this.MainChatBox.Text.Length;
+                this.MainChatBox.ScrollToCaret();
             }
         }
         private void loginBtn_Click(object sender, EventArgs e)
@@ -75,6 +77,7 @@ namespace Client
             if (e.KeyCode == Keys.Enter)
             {
                 MultiClient.Client.SendChatMessage(this.receiver.Text.Trim(), this.newMessageBox.Text.Trim());
+                this.newMessageBox.Text = "";
             }
         }
 

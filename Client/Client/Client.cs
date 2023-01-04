@@ -77,6 +77,7 @@ namespace MultiClient
 
             form.AddTextToMainChatBox("Connetcted");
         }
+
         private static void RequestLoop()
         {
 
@@ -179,8 +180,9 @@ namespace MultiClient
                 return;
             }
             string messageStr = Encoding.ASCII.GetString(RsaEncryption.RSADecrypt(Convert.FromBase64String(message.Message), userRSA.privateKey, false));
-            
+
             // Save and display the message 
+            Debug.WriteLine(messageStr);
             form.AddTextToMainChatBox(message.Sender +  " >> " + messageStr);
             AppendMessageToChat(phone_number,message.Sender , message.Sender + " >> " + messageStr);
         }
