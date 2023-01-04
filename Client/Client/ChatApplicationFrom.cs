@@ -33,16 +33,27 @@ namespace Client
         {
             AddInfoText("",true);
         }
+
+        delegate void SetMessageReceivedCallback(string id);
         public void SetMessageReceived(string id)
         {
+
+            if (this.MainChatBox.InvokeRequired)
+            {
+                SetMessageReceivedCallback d = new SetMessageReceivedCallback(SetMessageReceived);
+                this.Invoke(d, new object[] { id });
+                return;
+            }
+
             var textBox = messages.Find((x) => {
                 
                 return x.Item2 == id;
             })?.Item1;
 
+
             if (textBox != null)
             {
-                //textBox.Font = new Font(textBox.Font, FontStyle.Bold);
+                textBox.Font = new Font(textBox.Font, FontStyle.Bold);
             }
             else
             {
