@@ -26,7 +26,7 @@ namespace MultiServer
         public static readonly List<ClientManager> clientsProfile = new List<ClientManager>();
         public static List<SocketMessage> MessageQueue = new List<SocketMessage>();
 
-        private const string serverUUID = "www.7sni.com";
+        private const string serverUUID = "www.iss-chat-app.com";
 
         public static RsaEncryption rsaEncryption = new RsaEncryption(); 
 

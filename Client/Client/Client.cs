@@ -20,7 +20,7 @@ namespace MultiClient
     class Client
     {
         #region Parameters
-        private const string serverUUID = "www.7sni.com";
+        private const string serverUUID = "www.iss-chat-app.com";
 
         private static readonly Socket ClientSocket = new Socket
             (AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -192,10 +192,12 @@ namespace MultiClient
                 UUID = message.MessageUUID,
                 Message = messageStr,
                 Sender = message.Sender,
-                Received = false,
+                Received = true,
             };
 
-            form.AddMessage(chat_msg.Message, chat_msg.UUID, false);
+            form.AddMessage(chat_msg.Message, message.Sender, chat_msg.UUID, false , false);
+
+            AddMessageToChat(phone_number + "-" + message.Sender + ".bin", chat_msg);
 
             SendMessageReceived(chat_msg);
 
@@ -204,7 +206,6 @@ namespace MultiClient
         private static void TriggerMessageReceivedEvent(SocketMessage socketMessage)
         {
             // Get the sender certificate 
-            Debug.WriteLine("Message received");
             X509Certificate2 cert = GetX509Certificate(serverUUID + "/" + socketMessage.Sender);
             if (cert == null)
             {
@@ -221,13 +222,14 @@ namespace MultiClient
             string messageUUID = Encoding.ASCII.GetString(RsaEncryption.RSADecrypt(Convert.FromBase64String(socketMessage.Message), userRSA.privateKey, false));
 
             form.SetMessageReceived(messageUUID);
+
+            UpdateMessageReceivedFlag(phone_number + "-" + socketMessage.Sender, messageUUID);
         }
 
         private static void TriggerErrorEvent(string message)
         {
             form.AddTextToMainChatBox("Error occured : " + message);
         }
-
 
         #endregion
 
@@ -294,6 +296,8 @@ namespace MultiClient
 
         public static void SendChatMessage(string receiver, string msg)
         {
+            if (msg == "" || msg == null)
+                return;
             // Save locally
             AppendMessageToChat(phone_number, receiver, phone_number + " >> " + msg);
             // Get receiver public key 
@@ -319,7 +323,15 @@ namespace MultiClient
 
             SendSocketMessage(sm);
 
-            form.AddMessage(msg, sm.MessageUUID, false);
+            form.AddMessage(msg, receiver, sm.MessageUUID, false,true);
+
+            AddMessageToChat(phone_number + "-" + receiver + ".bin", new ChatMessage
+            {
+                UUID = sm.MessageUUID,
+                Message = msg,
+                Sender = phone_number,
+                Received = false,
+            });
         }
 
         private static void SendAESKey()
@@ -525,14 +537,38 @@ namespace MultiClient
             }
         }
 
-        public static void DisplayChatMessages(string filename)
+        public static void UpdateMessageReceivedFlag(string filename,string messageUUID)
         {
+            List<ChatMessage> messages = GetChatMessages(filename);
+
+            foreach (ChatMessage message in messages)
+            {
+                if (message.UUID == messageUUID)
+                {
+                    message.Received = true;
+                    break; 
+                }
+            }
+            //serialize
+            using (Stream stream = File.Open(filename, FileMode.OpenOrCreate))
+            {
+                var bformatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+
+                bformatter.Serialize(stream, messages);
+            }
+        }
+
+        public static void DisplayChatMessages(string receiver)
+        {
+            form.ClearTextFromMainChatBox();
+            string filename = phone_number + "-" + receiver + ".bin";
             List<ChatMessage> messages = GetChatMessages(filename);
             foreach( var msg in messages)
             {
-                form.AddMessage(msg.Message, msg.UUID, msg.Received);
+                form.AddMessage(msg.Message,null, msg.UUID, msg.Received , phone_number == msg.Sender);
             }
         }
+
         #endregion
     }
 }

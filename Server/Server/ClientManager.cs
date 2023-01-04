@@ -42,32 +42,44 @@ namespace ServerClient
 
             SocketMessage socketMessage = GetMessageFromSocket(AR);
 
-            switch (socketMessage.Flag)
+            try
             {
-                case ("login"):
-                    TriggerLoginEvent(socketMessage.Message);
-                    break;
-                case ("logout"):
-                    TriggerLogoutEvent();
-                    break;
-                case ("msg"):
-                    TriggerMessageEvent(socketMessage);
-                    break;
-                case ("AES"):
-                    SaveAESCredentials(socketMessage.Message);
-                    break;
-                case ("RCV"):
-                    TriggerMessageEvent(socketMessage);
-                    break;
-                default:
-                    SendSocketMessage(new SocketMessage
-                    {
-                        Flag = "ERR" , 
-                        Message = "Invalid command"
-                    });
-                    break;
+                if (socketMessage == null)
+                    throw new Exception();
+
+                switch (socketMessage.Flag)
+                {
+                    case ("login"):
+                        TriggerLoginEvent(socketMessage.Message);
+                        break;
+                    case ("logout"):
+                        TriggerLogoutEvent();
+                        break;
+                    case ("msg"):
+                        TriggerMessageEvent(socketMessage);
+                        break;
+                    case ("AES"):
+                        SaveAESCredentials(socketMessage.Message);
+                        break;
+                    case ("RCV"):
+                        TriggerMessageEvent(socketMessage);
+                        break;
+                    default:
+                        SendSocketMessage(new SocketMessage
+                        {
+                            Flag = "ERR",
+                            Message = "Invalid command"
+                        });
+                        break;
+                }
+                current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, MainLoop, current);
+            } catch (Exception)
+            {
+                Console.WriteLine("Client forcefully disconnected");
+                // Don't shutdown because the socket may be disposed and its disconnected anyway.
+                current.Close();
+                MultiServer.Server.clientSockets.Remove(current);
             }
-            current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, MainLoop, current);
         }
 
         #endregion
@@ -168,7 +180,6 @@ namespace ServerClient
         {
             Socket current = (Socket)AR.AsyncState;
             int received;
-
             try
             {
                 received = current.EndReceive(AR);
@@ -203,6 +214,15 @@ namespace ServerClient
                 MultiServer.Server.clientSockets.Remove(current);
                 return null;
             }
+            catch (Exception)
+            {
+                Console.WriteLine("Client forcefully disconnected");
+                // Don't shutdown because the socket may be disposed and its disconnected anyway.
+                current.Close();
+                MultiServer.Server.clientSockets.Remove(current);
+                return null;
+            }
+
         }
 
         private void SendChatMessage(SocketMessage msg)

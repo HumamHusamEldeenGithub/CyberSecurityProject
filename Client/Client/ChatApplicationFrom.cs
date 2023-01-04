@@ -53,28 +53,39 @@ namespace Client
 
             if (textBox != null)
             {
-                textBox.Font = new Font(textBox.Font, FontStyle.Bold);
+                textBox.Font = new Font(textBox.Font.FontFamily, (float)10.0 , FontStyle.Bold);
             }
             else
             {
                 Debug.WriteLine("ID NOT FOUND " + id.ToString());
             }
         }
-        delegate void AddMessageCallback(string message, string uuid, bool received);
-        public void AddMessage(string message, string uuid, bool received)
+        delegate void AddMessageCallback(string message, string sender, string uuid, bool received, bool im_sender);
+        public void AddMessage(string message,string sender, string uuid, bool received , bool im_sender)
         {
 
             if (this.MainChatBox.InvokeRequired)
             {
                 AddMessageCallback d = new AddMessageCallback(AddMessage);
-                this.Invoke(d, new object[] { message, uuid, received });
+                this.Invoke(d, new object[] { message,sender, uuid, received , im_sender });
                 return;
             }
+
+            if (sender != null && sender != this.receiver.Text.Trim()) return;
 
             TextBox newTextBox = new TextBox();
             newTextBox.Text = message;
             newTextBox.ReadOnly = true;
-            newTextBox.BackColor = Color.DarkGreen; newTextBox.ForeColor = Color.White;
+            if (im_sender)
+            {
+                newTextBox.BackColor = ColorTranslator.FromHtml("#233D4D"); ; newTextBox.ForeColor = Color.White;
+            }
+
+            else
+            {
+                newTextBox.BackColor = ColorTranslator.FromHtml("#FCCA46"); ; newTextBox.ForeColor = Color.Black;
+            }
+                
             newTextBox.Size = new Size((int)(MainChatBox.Size.Width * 0.95f), newTextBox.Size.Height);
 
             if (received)
@@ -85,7 +96,7 @@ namespace Client
             messages.Add(new Tuple<TextBox, string>(newTextBox, uuid));
 
             this.MainChatBox.Controls.Add(newTextBox);
-
+            MainChatBox.ScrollControlIntoView(newTextBox);
         }
 
 
@@ -110,13 +121,14 @@ namespace Client
                 }
 
                 TextBox newTextBox = new TextBox();
-
                 newTextBox.Text = text;
                 newTextBox.ReadOnly= true;
-                newTextBox.BackColor= Color.Purple; newTextBox.ForeColor= Color.White;
+                newTextBox.BackColor = ColorTranslator.FromHtml("#233D4D"); ; newTextBox.ForeColor = Color.White;
                 newTextBox.Size = new Size((int)(MainChatBox.Size.Width * 0.95f), newTextBox.Size.Height);
+                
 
                 this.MainChatBox.Controls.Add(newTextBox);
+                MainChatBox.ScrollControlIntoView(newTextBox);
             }
         }
 
@@ -129,7 +141,7 @@ namespace Client
 
         private void openChatBtn_Click(object sender, EventArgs e)
         {
-            MultiClient.Client.OpenChat(this.receiver.Text.Trim());
+            MultiClient.Client.DisplayChatMessages(this.receiver.Text.Trim());
         }
 
         private void sendBtn_Click(object sender, EventArgs e)
