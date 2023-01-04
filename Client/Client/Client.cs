@@ -195,7 +195,7 @@ namespace MultiClient
                 Received = false,
             };
 
-            form.AddMessage(chat_msg.Message, chat_msg.UUID);
+            form.AddMessage(chat_msg.Message, chat_msg.UUID, false);
 
             SendMessageReceived(chat_msg);
 
@@ -319,7 +319,7 @@ namespace MultiClient
 
             SendSocketMessage(sm);
 
-            form.AddMessage(msg, sm.MessageUUID);
+            form.AddMessage(msg, sm.MessageUUID, false);
         }
 
         private static void SendAESKey()
@@ -525,18 +525,13 @@ namespace MultiClient
             }
         }
 
-        private static string DisplayChatMessages(string filename)
+        public static void DisplayChatMessages(string filename)
         {
             List<ChatMessage> messages = GetChatMessages(filename);
-            string chat = ""; 
-            foreach(ChatMessage message in messages)
+            foreach( var msg in messages)
             {
-                chat += message.Sender + " >> " + message.Message;
-                if (message.Received)
-                    chat += " ^^";
-                chat += "\n";
+                form.AddMessage(msg.Message, msg.UUID, msg.Received);
             }
-            return chat; 
         }
         #endregion
     }

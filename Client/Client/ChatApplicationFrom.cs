@@ -60,14 +60,14 @@ namespace Client
                 Debug.WriteLine("ID NOT FOUND " + id.ToString());
             }
         }
-        delegate void AddMessageCallback(string message, string uuid);
-        public void AddMessage(string message, string uuid)
+        delegate void AddMessageCallback(string message, string uuid, bool received);
+        public void AddMessage(string message, string uuid, bool received)
         {
 
             if (this.MainChatBox.InvokeRequired)
             {
                 AddMessageCallback d = new AddMessageCallback(AddMessage);
-                this.Invoke(d, new object[] { message, uuid });
+                this.Invoke(d, new object[] { message, uuid, received });
                 return;
             }
 
@@ -76,6 +76,11 @@ namespace Client
             newTextBox.ReadOnly = true;
             newTextBox.BackColor = Color.DarkGreen; newTextBox.ForeColor = Color.White;
             newTextBox.Size = new Size((int)(MainChatBox.Size.Width * 0.95f), newTextBox.Size.Height);
+
+            if (received)
+            {
+                newTextBox.Font = new Font(newTextBox.Font, FontStyle.Bold);
+            }
 
             messages.Add(new Tuple<TextBox, string>(newTextBox, uuid));
 
