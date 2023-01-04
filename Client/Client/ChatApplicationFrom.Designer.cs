@@ -68,6 +68,7 @@
             this.passwordInput.Name = "passwordInput";
             this.passwordInput.Size = new System.Drawing.Size(220, 20);
             this.passwordInput.TabIndex = 3;
+            this.passwordInput.UseSystemPasswordChar = true;
             // 
             // label1
             // 
@@ -83,7 +84,9 @@
             // 
             // MainChatBox
             // 
-            this.MainChatBox.Font = new System.Drawing.Font("Tahoma", 10F);
+            this.MainChatBox.BackColor = System.Drawing.SystemColors.WindowText;
+            this.MainChatBox.Font = new System.Drawing.Font("Trebuchet MS", 11.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.MainChatBox.ForeColor = System.Drawing.Color.Purple;
             this.MainChatBox.Location = new System.Drawing.Point(13, 108);
             this.MainChatBox.MinimumSize = new System.Drawing.Size(500, 300);
             this.MainChatBox.Multiline = true;
@@ -132,6 +135,7 @@
             this.newMessageBox.Name = "newMessageBox";
             this.newMessageBox.Size = new System.Drawing.Size(350, 20);
             this.newMessageBox.TabIndex = 9;
+            this.newMessageBox.KeyDown += new System.Windows.Forms.KeyEventHandler(this.newMessageBox_KeyDown);
             // 
             // loginBtn
             // 
@@ -168,6 +172,7 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.SystemColors.ControlLightLight;
             this.ClientSize = new System.Drawing.Size(526, 491);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.openChatBtn);

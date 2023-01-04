@@ -54,7 +54,6 @@ namespace Client
                 this.MainChatBox.Text = text;
             }
         }
-        #region Empty functions
         private void loginBtn_Click(object sender, EventArgs e)
         {
             string phonenumber = this.phoneInput.Text.Trim();
@@ -71,6 +70,15 @@ namespace Client
         {
             MultiClient.Client.SendChatMessage(this.receiver.Text.Trim(), this.newMessageBox.Text.Trim());
         }
+        private void newMessageBox_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                MultiClient.Client.SendChatMessage(this.receiver.Text.Trim(), this.newMessageBox.Text.Trim());
+            }
+        }
+
+        #region Empty functions
 
         private void MainChatBox_TextChanged(object sender, EventArgs e)
         {
@@ -86,5 +94,6 @@ namespace Client
 
         }
         #endregion
+
     }
 }

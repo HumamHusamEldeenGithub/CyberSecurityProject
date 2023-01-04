@@ -9,7 +9,6 @@ using MongoDB.Bson;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using Server;
-using MultiServer; 
 
 namespace ServerClient
 {
@@ -58,7 +57,11 @@ namespace ServerClient
                     SaveAESCredentials(socketMessage.Message);
                     break;
                 default:
-                    SendSocketMessage("ERR", "Invalid command");
+                    SendSocketMessage(new SocketMessage
+                    {
+                        Flag = "ERR" , 
+                        Message = "Invalid command"
+                    });
                     break;
             }
             current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, MainLoop, current);
@@ -69,7 +72,11 @@ namespace ServerClient
         private void TriggerLoginEvent(string input)
         {
             if (this.phone_number != null)
-                SendSocketMessage("ERR", "User already logged in ...");
+                SendSocketMessage(new SocketMessage
+                {
+                    Flag = "ERR",
+                    Message = "User already logged in ..."
+                });
 
             string pattern = @"-usr=([0-9]+) -pass=([A-Za-z0-9]+)";
             var matches = Regex.Match(input, pattern);
@@ -79,15 +86,22 @@ namespace ServerClient
 
             if (this.phone_number == "" || this.password== "")
             {
-                
-                SendSocketMessage("ERR", "Invalid Username and Password");
+                SendSocketMessage(new SocketMessage
+                {
+                    Flag = "ERR",
+                    Message = "Invalid Username and Password"
+                });
             }
 
             if (!CheckUserCredentails())
             {
                 Console.WriteLine("Password incorrect ! ");
 
-                SendSocketMessage("ERR","Password incorrect ! ");
+                SendSocketMessage(new SocketMessage
+                {
+                    Flag = "ERR",
+                    Message = "Password incorrect ! "
+                });
 
                 ResetClient();
 
@@ -96,21 +110,33 @@ namespace ServerClient
 
             Console.WriteLine("User with phone number " + this.phone_number + " has logged in .");
 
-            SendSocketMessage("login_successful", "Logged in successfully!");
+            SendSocketMessage(new SocketMessage
+            {
+                Flag = "login_successful",
+                Message = "Logged in successfully!"
+            });
             CheckForIncomingMessages();
         }
 
         private void TriggerLogoutEvent()
         {
             ResetClient();
-            SendSocketMessage("ERR","Logged out successfully");
+            SendSocketMessage(new SocketMessage
+            {
+                Flag = "logout_successful",
+                Message = "Logged out successfully"
+            });
         }
 
         private void TriggerMessageEvent(SocketMessage msg)
         {
             if (this.profile == null)
             {
-                SendSocketMessage("ERR","Plesae log in first ...");
+                SendSocketMessage(new SocketMessage
+                {
+                    Flag = "ERR",
+                    Message = "Plesae log in first ..."
+                });
                 return;
             }
             msg.Sender = this.phone_number; 
@@ -123,8 +149,7 @@ namespace ServerClient
             {
                 if (message.Receiver == this.phone_number)
                 {
-                    string jsonString = JsonSerializer.Serialize(message);
-                    SendSocketMessage(jsonString);
+                    SendSocketMessage(message);
                     MultiServer.Server.MessageQueue.Remove(message);
                     System.Threading.Thread.Sleep(500);
                 }
@@ -178,49 +203,22 @@ namespace ServerClient
 
         private void SendChatMessage(SocketMessage msg)
         {
-            string jsonString = JsonSerializer.Serialize(msg);
 
             foreach (ClientManager client in MultiServer.Server.clientsProfile)
             {
                 if (client.phone_number == msg.Receiver)
                 {
-                    client.SendSocketMessage(jsonString);
+                    client.SendSocketMessage(msg);
                     return;
                 }
             }
             MultiServer.Server.MessageQueue.Add(msg);
         }
 
-        private void SendSocketMessage(string flag, string msg)
+        private void SendSocketMessage(SocketMessage socketMessage)
         {
-            SocketMessage socketMessage = new SocketMessage
-            {
-                Flag = flag,
-                Message = msg,
-            };
-
             string jsonString = JsonSerializer.Serialize(socketMessage);
 
-            byte[] signatureBuff = RsaEncryption.CreateSignature(Encoding.ASCII.GetBytes(jsonString), MultiServer.Server.rsaEncryption.privateKey);
-
-            SignedSocketMessage signedSocketMessage = new SignedSocketMessage
-            {
-                Data = jsonString,
-                Signature = Convert.ToBase64String(signatureBuff)
-            };
-
-            string response = JsonSerializer.Serialize(signedSocketMessage);
-
-            if (this.aes_key != null)
-            {
-                response = AesEncryption.Encryptor.EncryptDataWithAes(response, aes_key, aes_iv);
-            }
-
-            this.socket.Send(Encoding.ASCII.GetBytes(response));
-        }
-
-        private void SendSocketMessage(string jsonString)
-        {
             byte[] signatureBuff = RsaEncryption.CreateSignature(Encoding.ASCII.GetBytes(jsonString), MultiServer.Server.rsaEncryption.privateKey);
 
             SignedSocketMessage signedSocketMessage = new SignedSocketMessage

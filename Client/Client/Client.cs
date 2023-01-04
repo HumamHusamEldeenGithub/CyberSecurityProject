@@ -149,6 +149,7 @@ namespace MultiClient
             phone_number = req_phone_number;
             SendSocketMessage(socketMessage);
         }
+
         private static void TriggerLoginSuccessfulEvent()
         {
             form.AddTextToMainChatBox("Logged in successfully");
@@ -174,7 +175,8 @@ namespace MultiClient
             if (!RsaEncryption.VerifySignature(Convert.FromBase64String(message.Message),
                 receiverRSA.publicKey, Convert.FromBase64String(message.Signature)))
             {
-                form.AddTextToMainChatBox("invalid signature");
+                Debug.WriteLine("invalid signature");
+                return;
             }
             string messageStr = Encoding.ASCII.GetString(RsaEncryption.RSADecrypt(Convert.FromBase64String(message.Message), userRSA.privateKey, false));
             
@@ -231,27 +233,6 @@ namespace MultiClient
             HandelIncomingData(socketMessage);
         }
 
-        private static void SendSocketMessage(SocketMessage socketMessage )
-        {
-            string jsonString = JsonSerializer.Serialize(socketMessage);
-            
-            SignedSocketMessage signedSocketMessage = new SignedSocketMessage
-            {
-                Data = jsonString,
-            };
-
-            string response = JsonSerializer.Serialize(signedSocketMessage);
-
-            Debug.WriteLine(response.Length.ToString());
-
-            response = AesEncryption.AesEncryptor.EncryptDataWithAes(response, aes_key, aes_iv);
-
-            Debug.WriteLine(response.Length.ToString());
-
-            byte[] buffer = Encoding.ASCII.GetBytes(response);
-
-            ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
-        }
         public static void SendChatMessage(string receiver, string msg)
         {
             // Save locally
@@ -279,20 +260,19 @@ namespace MultiClient
 
             });
         }
+
         private static void SendAESKey()
         {
             SocketMessage socketMessage = new SocketMessage { Flag = "AES", Message = aes_key + " " + aes_iv };
+
             string jsonString = JsonSerializer.Serialize(socketMessage);
 
             SignedSocketMessage signedSocketMessage = new SignedSocketMessage
             {
                 Data = jsonString,
-                Signature = ""
             };
 
             string response = JsonSerializer.Serialize(signedSocketMessage);
-
-            Debug.WriteLine(response.Length.ToString());
 
             byte[] buffer = Encoding.ASCII.GetBytes(response);
 
@@ -300,17 +280,36 @@ namespace MultiClient
 
             ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
         }
+
+        private static void SendSocketMessage(SocketMessage socketMessage)
+        {
+            string jsonString = JsonSerializer.Serialize(socketMessage);
+
+            SignedSocketMessage signedSocketMessage = new SignedSocketMessage
+            {
+                Data = jsonString,
+            };
+
+            string response = JsonSerializer.Serialize(signedSocketMessage);
+
+            response = AesEncryption.AesEncryptor.EncryptDataWithAes(response, aes_key, aes_iv);
+
+            byte[] buffer = Encoding.ASCII.GetBytes(response);
+
+            ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
+        }
+
         #endregion
 
         #region Helpers
 
         public static void OpenChat(string receiver)
         {
+            form.ClearTextFromMainChatBox();
             string filename = phone_number + "-" + receiver + ".txt";
             if (File.Exists(filename))
             {
                 string str = File.ReadAllText(filename);
-                form.ClearTextFromMainChatBox();
                 form.AddTextToMainChatBox(str);
             }
         }
