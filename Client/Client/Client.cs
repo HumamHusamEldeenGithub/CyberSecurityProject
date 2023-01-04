@@ -13,13 +13,14 @@ using System.IO;
 using System.Windows.Forms;
 using System.Diagnostics;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace MultiClient
 {
     class Client
     {
         #region Parameters
-        private const string serverUUID = "www.chatapp.com";
+        private const string serverUUID = "www.7sni.com";
 
         private static readonly Socket ClientSocket = new Socket
             (AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -115,7 +116,7 @@ namespace MultiClient
                     TriggerNewMessageEvent(socketMessage);
                     break;
                 case ("RCV"):
-                    TriggerMessageReceivedEvent();
+                    TriggerMessageReceivedEvent(socketMessage);
                     break;
                 case ("ERR"):
                     TriggerErrorEvent(message);
@@ -165,6 +166,8 @@ namespace MultiClient
         private static void TriggerNewMessageEvent(SocketMessage message)
         {
             // Get the sender certificate 
+            Debug.WriteLine("New message");
+
             X509Certificate2 cert = GetX509Certificate(serverUUID + "/" + message.Sender);
             if (cert == null)
             {
@@ -177,19 +180,47 @@ namespace MultiClient
                 receiverRSA.publicKey, Convert.FromBase64String(message.Signature)))
             {
                 Debug.WriteLine("invalid signature");
-                return;
             }
             string messageStr = Encoding.ASCII.GetString(RsaEncryption.RSADecrypt(Convert.FromBase64String(message.Message), userRSA.privateKey, false));
 
             // Save and display the message 
-            Debug.WriteLine(messageStr);
-            form.AddTextToMainChatBox(message.Sender +  " >> " + messageStr);
+
             AppendMessageToChat(phone_number,message.Sender , message.Sender + " >> " + messageStr);
+
+            var chat_msg = new ChatMessage
+            {
+                UUID = message.MessageUUID,
+                Message = messageStr,
+                Sender = message.Sender,
+                Received = false,
+            };
+
+            form.AddMessage(chat_msg.Message, chat_msg.UUID);
+
+            SendMessageReceived(chat_msg);
+
         }
 
-        private static void TriggerMessageReceivedEvent()
+        private static void TriggerMessageReceivedEvent(SocketMessage socketMessage)
         {
-            form.AddTextToMainChatBox("Message Sent and Received successfully !");
+            // Get the sender certificate 
+            Debug.WriteLine("Message received");
+            X509Certificate2 cert = GetX509Certificate(serverUUID + "/" + socketMessage.Sender);
+            if (cert == null)
+            {
+                form.AddTextToMainChatBox("User doesn't have public key");
+                return;
+            }
+            receiverRSA = new RsaEncryption(cert.PublicKey.Key.ToXmlString(false), false);
+
+            if (!RsaEncryption.VerifySignature(Convert.FromBase64String(socketMessage.Message),
+                receiverRSA.publicKey, Convert.FromBase64String(socketMessage.Signature)))
+            {
+                Debug.WriteLine("invalid signature");
+            }
+            string messageUUID = Encoding.ASCII.GetString(RsaEncryption.RSADecrypt(Convert.FromBase64String(socketMessage.Message), userRSA.privateKey, false));
+
+            form.SetMessageReceived(messageUUID);
         }
 
         private static void TriggerErrorEvent(string message)
@@ -235,12 +266,36 @@ namespace MultiClient
             HandelIncomingData(socketMessage);
         }
 
+        public static void SendMessageReceived(ChatMessage message)
+        {
+            // Get receiver public key 
+            X509Certificate2 cert = GetX509Certificate(serverUUID + "/" + message.Sender);
+            if (cert == null)
+            {
+                form.AddTextToMainChatBox("User doesn't have public key");
+                return;
+            }
+            receiverRSA = new RsaEncryption(cert.PublicKey.Key.ToXmlString(false), false);
+
+            string encryptedUUID = Convert.ToBase64String(RsaEncryption.RSAEncrypt(Encoding.ASCII.GetBytes(message.UUID), receiverRSA.publicKey, false));
+            string signature = Convert.ToBase64String(RsaEncryption.CreateSignature(Convert.FromBase64String(encryptedUUID), userRSA.privateKey));
+
+            SocketMessage socketMessage = new SocketMessage
+            {
+                Flag = "RCV",
+                Message = encryptedUUID,
+                Signature = signature,
+                Receiver = message.Sender,
+                Sender = phone_number
+            };
+
+            SendSocketMessage(socketMessage);
+        }
+
         public static void SendChatMessage(string receiver, string msg)
         {
             // Save locally
             AppendMessageToChat(phone_number, receiver, phone_number + " >> " + msg);
-            form.AddTextToMainChatBox(phone_number + " >> " + msg);
-
             // Get receiver public key 
             X509Certificate2 cert = GetX509Certificate(serverUUID + "/" + receiver);
             if (cert == null)
@@ -253,14 +308,18 @@ namespace MultiClient
             string encryptedMsg = Convert.ToBase64String(RsaEncryption.RSAEncrypt(Encoding.ASCII.GetBytes(msg), receiverRSA.publicKey, false));
             string signature = Convert.ToBase64String(RsaEncryption.CreateSignature(Convert.FromBase64String(encryptedMsg), userRSA.privateKey));
 
-            SendSocketMessage( new SocketMessage
+            var sm = new SocketMessage
             {
                 Flag = "msg",
                 Message = encryptedMsg,
                 Receiver = receiver,
                 Signature = signature,
+                MessageUUID = System.Guid.NewGuid().ToString()
+            };
 
-            });
+            SendSocketMessage(sm);
+
+            form.AddMessage(msg, sm.MessageUUID);
         }
 
         private static void SendAESKey()
@@ -281,6 +340,7 @@ namespace MultiClient
             buffer = RsaEncryption.RSAEncrypt(buffer, serverRSA.publicKey, false);
 
             ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
+            Debug.WriteLine(Encoding.ASCII.GetString(buffer));
         }
 
         private static void SendSocketMessage(SocketMessage socketMessage)
@@ -435,6 +495,48 @@ namespace MultiClient
 
                 return cert;
             }
+        }
+
+        private static List<ChatMessage> GetChatMessages(string filename)
+        {
+            if (!File.Exists(filename))
+                return new List<ChatMessage>();
+            //deserialize
+            using (Stream stream = File.Open(filename, FileMode.Open))
+            {
+                var bformatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+
+                List<ChatMessage> messages = (List<ChatMessage>)bformatter.Deserialize(stream);
+                return messages; 
+            }
+        }
+
+        private static void AddMessageToChat(string filename , ChatMessage message)
+        {
+            List<ChatMessage> messages = GetChatMessages(filename);
+
+            messages.Add(message);
+            //serialize
+            using (Stream stream = File.Open(filename, FileMode.OpenOrCreate))
+            {
+                var bformatter = new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
+
+                bformatter.Serialize(stream, messages);
+            }
+        }
+
+        private static string DisplayChatMessages(string filename)
+        {
+            List<ChatMessage> messages = GetChatMessages(filename);
+            string chat = ""; 
+            foreach(ChatMessage message in messages)
+            {
+                chat += message.Sender + " >> " + message.Message;
+                if (message.Received)
+                    chat += " ^^";
+                chat += "\n";
+            }
+            return chat; 
         }
         #endregion
     }

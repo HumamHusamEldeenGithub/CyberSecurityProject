@@ -26,7 +26,7 @@ namespace MultiServer
         public static readonly List<ClientManager> clientsProfile = new List<ClientManager>();
         public static List<SocketMessage> MessageQueue = new List<SocketMessage>();
 
-        private const string serverUUID = "www.chatapp.com";
+        private const string serverUUID = "www.7sni.com";
 
         public static RsaEncryption rsaEncryption = new RsaEncryption(); 
 
@@ -167,7 +167,7 @@ namespace MultiServer
 
                 store.Close();
 
-                SavePrivateKeyToDB(uuid, RSA.ToXmlString(true));
+                //SavePrivateKeyToDB(uuid, RSA.ToXmlString(true));
 
                 using (StreamWriter sw = File.AppendText(uuid + "-private-key.txt"))
                 {

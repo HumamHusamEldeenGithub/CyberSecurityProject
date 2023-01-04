@@ -9,6 +9,7 @@ namespace MultiClient
     public class SocketMessage
     {
         public string Flag { get; set; }
+        public string MessageUUID { get; set; }
         public string Message { get; set; }
         public string Sender { get; set; }
         public string Receiver { get; set; }
@@ -20,5 +21,14 @@ namespace MultiClient
         public string Data { get; set; }
         public string Signature { get; set; }
 
+    }
+
+    [Serializable]
+    class ChatMessage
+    {
+        public string UUID { get; set; }
+        public string Message { get; set; }
+        public string Sender { get; set; }
+        public bool Received { get; set; }
     }
 }

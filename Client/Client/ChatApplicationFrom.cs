@@ -2,60 +2,108 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Runtime.ConstrainedExecution;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using MultiClient;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Client
 {
     public partial class ChatApplicationFrom : Form
     {
+        List<Tuple<TextBox, string>> messages;
         public ChatApplicationFrom()
         {
             InitializeComponent();
-        }
 
+            messages = new List<Tuple<TextBox, string>>();
+        }
 
         public void AddTextToMainChatBox(string msg)
         {
-            SetText(msg,false); 
+            AddInfoText(msg,false); 
         }
 
         public void ClearTextFromMainChatBox()
         {
-            SetText("",true);
+            AddInfoText("",true);
+        }
+        public void SetMessageReceived(string id)
+        {
+            var textBox = messages.Find((x) => {
+                
+                return x.Item2 == id;
+            })?.Item1;
+
+            if (textBox != null)
+            {
+                //textBox.Font = new Font(textBox.Font, FontStyle.Bold);
+            }
+            else
+            {
+                Debug.WriteLine("ID NOT FOUND " + id.ToString());
+            }
+        }
+        delegate void AddMessageCallback(string message, string uuid);
+        public void AddMessage(string message, string uuid)
+        {
+
+            if (this.MainChatBox.InvokeRequired)
+            {
+                AddMessageCallback d = new AddMessageCallback(AddMessage);
+                this.Invoke(d, new object[] { message, uuid });
+                return;
+            }
+
+            TextBox newTextBox = new TextBox();
+            newTextBox.Text = message;
+            newTextBox.ReadOnly = true;
+            newTextBox.BackColor = Color.DarkGreen; newTextBox.ForeColor = Color.White;
+            newTextBox.Size = new Size((int)(MainChatBox.Size.Width * 0.95f), newTextBox.Size.Height);
+
+            messages.Add(new Tuple<TextBox, string>(newTextBox, uuid));
+
+            this.MainChatBox.Controls.Add(newTextBox);
+
         }
 
-        delegate void SetTextCallback(string text , bool clear);
 
-        private void SetText(string text, bool clear)
+        delegate void SetTextCallback(string text, bool clear);
+        private void AddInfoText(string text, bool clear)
         {
             // InvokeRequired required compares the thread ID of the
             // calling thread to the thread ID of the creating thread.
             // If these threads are different, it returns true.
+
+
             if (this.MainChatBox.InvokeRequired)
             {
-                SetTextCallback d = new SetTextCallback(SetText);
+                SetTextCallback d = new SetTextCallback(AddInfoText);
                 this.Invoke(d, new object[] { text , clear});
             }
             else
             {
                 if (clear)
                 {
-                    text = (text).Replace("\n", "\r\n");
+                    this.MainChatBox.Controls.Clear();
                 }
-                else
-                {
-                    text = (this.MainChatBox.Text + "\n" + text).Replace("\n", "\r\n");
-                }
-                this.MainChatBox.Text = text;
-                this.MainChatBox.SelectionStart = this.MainChatBox.Text.Length;
-                this.MainChatBox.ScrollToCaret();
+
+                TextBox newTextBox = new TextBox();
+
+                newTextBox.Text = text;
+                newTextBox.ReadOnly= true;
+                newTextBox.BackColor= Color.Purple; newTextBox.ForeColor= Color.White;
+                newTextBox.Size = new Size((int)(MainChatBox.Size.Width * 0.95f), newTextBox.Size.Height);
+
+                this.MainChatBox.Controls.Add(newTextBox);
             }
         }
+
         private void loginBtn_Click(object sender, EventArgs e)
         {
             string phonenumber = this.phoneInput.Text.Trim();
@@ -98,5 +146,19 @@ namespace Client
         }
         #endregion
 
+        private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void textBox1_TextChanged(object sender, EventArgs e)
+        {
+
+        }
+
+        private void MainChatBox_Paint(object sender, PaintEventArgs e)
+        {
+
+        }
     }
 }

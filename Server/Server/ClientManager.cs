@@ -56,6 +56,9 @@ namespace ServerClient
                 case ("AES"):
                     SaveAESCredentials(socketMessage.Message);
                     break;
+                case ("RCV"):
+                    TriggerMessageEvent(socketMessage);
+                    break;
                 default:
                     SendSocketMessage(new SocketMessage
                     {
