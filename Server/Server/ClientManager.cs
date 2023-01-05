@@ -9,6 +9,7 @@ using MongoDB.Bson;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using Server;
+using System.Security.Cryptography;
 
 namespace ServerClient
 {
@@ -308,7 +309,6 @@ namespace ServerClient
             this.profile = bsonDoc.ToDictionary();
             string pass = (string)profile["password"];
 
-            // TODO : Hash and Compare the hash 
             if (string.Compare(pass, this.password) == 0)
                 return true;
             return false;

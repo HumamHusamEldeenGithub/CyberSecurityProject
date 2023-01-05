@@ -143,10 +143,13 @@ namespace MultiClient
         {
             form.AddTextToMainChatBox("Logging ...");
 
+            SHA256 alg = SHA256.Create();
+            byte[] hash = alg.ComputeHash(Encoding.ASCII.GetBytes(req_password));
+
             SocketMessage socketMessage = new SocketMessage
             {
                 Flag = "login",
-                Message = "-usr=" + req_phone_number + " -pass=" + req_password,
+                Message = "-usr=" + req_phone_number + " -pass=" + Convert.ToBase64String(hash),
             };
             phone_number = req_phone_number;
             SendSocketMessage(socketMessage);

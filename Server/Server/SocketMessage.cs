@@ -20,7 +20,6 @@ class SignedSocketMessage
     public string Signature { get; set; }
 
 }
-
 class ChatMessage
 {
     public string UUID;
